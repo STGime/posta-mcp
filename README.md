@@ -57,6 +57,8 @@ Cursor, Windsurf, VS Code (Cline/Continue), and Zed use the same `command`/`args
 | `POSTA_API_TOKEN` | yes | — | Your `posta_` API token. |
 | `POSTA_BASE_URL` | no | `https://api.getposta.app/v1` | Override the API base URL (e.g. staging). |
 
+> The server reads these from the process environment provided by your MCP client — it does **not** auto-load a `.env` file. `.env.example` is a reference for the values you set in your client config. For local `npm run dev`, export the variable yourself (e.g. `POSTA_API_TOKEN=… npm run dev`) or use `node --env-file=.env dist/index.js` on Node ≥ 20.6.
+
 ## Tools
 
 All tools are namespaced `posta_*` and map 1:1 to the Posta REST API.
@@ -102,7 +104,7 @@ All tools are namespaced `posta_*` and map 1:1 to the Posta REST API.
 ## Notes
 
 - **Plan enforcement** is server-side. Tool calls go through the same middleware as the web app; exceeding a plan limit returns an API error surfaced as a tool error.
-- **Security:** `posta_upload_from_url` accepts HTTPS URLs only and blocks private/internal hosts (SSRF guard).
+- **Security:** `posta_upload_from_url` has an SSRF guard — HTTPS only; the host is DNS-resolved and every resolved IP is checked against private/internal/link-local ranges (IPv4 and IPv6, including cloud-metadata `169.254.169.254`); redirects are followed manually and re-validated on each hop; downloads are capped at 100 MB; and all outbound requests have timeouts.
 - The token is read from `POSTA_API_TOKEN` only — it is never logged. Protocol traffic uses stdout; all diagnostics go to stderr.
 
 ## Roadmap

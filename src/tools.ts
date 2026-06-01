@@ -36,7 +36,10 @@ function guard<A>(fn: (args: A) => Promise<unknown>) {
   };
 }
 
-function qs(params: Record<string, string | number | undefined>): string {
+/** Encode a value for safe interpolation into a URL path segment. */
+const enc = (v: string | number) => encodeURIComponent(String(v));
+
+export function qs(params: Record<string, string | number | undefined>): string {
   const pairs = Object.entries(params)
     .filter(([, v]) => v !== undefined && v !== "")
     .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
@@ -67,7 +70,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
         "List Pinterest boards for a connected Pinterest account. Pinterest posts require a boardId in platformConfigurations.",
       inputSchema: { accountId: z.string().describe("Connected Pinterest social account id") },
     },
-    guard(({ accountId }) => client.get(`/social-accounts/${accountId}/boards`)),
+    guard(({ accountId }) => client.get(`/social-accounts/${enc(accountId)}/boards`)),
   );
 
   // ── Posts ───────────────────────────────────────────────────────────────
@@ -97,7 +100,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Get a single post by id, including its per-platform results.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.get(`/posts/${postId}`)),
+    guard(({ postId }) => client.get(`/posts/${enc(postId)}`)),
   );
 
   server.registerTool(
@@ -144,7 +147,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
         patch: z.record(z.any()).describe("Partial post fields to update"),
       },
     },
-    guard(({ postId, patch }) => client.patch(`/posts/${postId}`, patch)),
+    guard(({ postId, patch }) => client.patch(`/posts/${enc(postId)}`, patch)),
   );
 
   server.registerTool(
@@ -159,7 +162,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       },
     },
     guard(({ postId, scheduledAt }) =>
-      client.post(`/posts/${postId}/schedule`, { scheduledAt }),
+      client.post(`/posts/${enc(postId)}/schedule`, { scheduledAt }),
     ),
   );
 
@@ -170,7 +173,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Publish a post immediately to all of its target platforms.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.post(`/posts/${postId}/publish`)),
+    guard(({ postId }) => client.post(`/posts/${enc(postId)}/publish`)),
   );
 
   server.registerTool(
@@ -180,7 +183,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Cancel a scheduled post so it will not be published.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.post(`/posts/${postId}/cancel`)),
+    guard(({ postId }) => client.post(`/posts/${enc(postId)}/cancel`)),
   );
 
   server.registerTool(
@@ -190,7 +193,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Permanently delete a post.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.delete(`/posts/${postId}`)),
+    guard(({ postId }) => client.delete(`/posts/${enc(postId)}`)),
   );
 
   server.registerTool(
@@ -251,7 +254,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Get a single media asset by id (status, variants, URLs).",
       inputSchema: { mediaId: z.string() },
     },
-    guard(({ mediaId }) => client.get(`/media/${mediaId}`)),
+    guard(({ mediaId }) => client.get(`/media/${enc(mediaId)}`)),
   );
 
   server.registerTool(
@@ -261,7 +264,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Delete a media asset from the library.",
       inputSchema: { mediaId: z.string() },
     },
-    guard(({ mediaId }) => client.delete(`/media/${mediaId}`)),
+    guard(({ mediaId }) => client.delete(`/media/${enc(mediaId)}`)),
   );
 
   server.registerTool(
@@ -301,7 +304,7 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Get detailed specs for a single platform (e.g. instagram, tiktok, bluesky, linkedin, x).",
       inputSchema: { platform: z.string() },
     },
-    guard(({ platform }) => client.get(`/platforms/${platform}`)),
+    guard(({ platform }) => client.get(`/platforms/${enc(platform)}`)),
   );
 
   server.registerTool(
@@ -373,7 +376,16 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       title: "Compare posts",
       description: "Compare 2–4 posts side by side by their analytics.",
       inputSchema: {
-        postIds: z.string().describe("Comma-separated post ids, e.g. 'id1,id2,id3'"),
+        postIds: z
+          .string()
+          .describe("Comma-separated post ids, e.g. 'id1,id2,id3'")
+          .refine(
+            (s) => {
+              const n = s.split(",").filter((p) => p.trim() !== "").length;
+              return n >= 2 && n <= 4;
+            },
+            { message: "Provide between 2 and 4 comma-separated post ids." },
+          ),
       },
     },
     guard(({ postIds }) => client.get(`/analytics/compare${qs({ postIds })}`)),
