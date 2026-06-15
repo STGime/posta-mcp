@@ -9,32 +9,27 @@ Where the [Posta skill](https://clawhub.ai/stgime/posta) works inside Claude Cod
 - Node.js ≥ 18
 - A Posta account and an API token (Posta dashboard → **Settings → API tokens**). Tokens start with `posta_`.
 
-## Install & build
+## Install
 
-```bash
-npm install
-npm run build
-```
+`posta-mcp` is published on npm, so you don't clone or build anything — your MCP client downloads and runs it automatically with `npx`. Follow these five steps.
 
-## Configure your MCP client
+### Step 1 — Get your Posta API token
 
-Add the server to your client's MCP config. Example (Claude Desktop — `claude_desktop_config.json`):
+In the [Posta dashboard](https://getposta.app), go to **Settings → API tokens**, click **Create token**, and copy it. It starts with `posta_`. You only see it once, so copy it now.
 
-```json
-{
-  "mcpServers": {
-    "posta": {
-      "command": "node",
-      "args": ["/absolute/path/to/posta-mcp/dist/index.js"],
-      "env": {
-        "POSTA_API_TOKEN": "posta_your_token_here"
-      }
-    }
-  }
-}
-```
+### Step 2 — Open your MCP client's config file
 
-Once published to npm you can use `npx` instead of an absolute path:
+For **Claude Desktop**, the file is `claude_desktop_config.json`:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+The easiest way to open it: in Claude Desktop go to **Settings → Developer → Edit Config**. If the file doesn't exist yet, create it.
+(Using a different client? See [the table below](#config-location-per-client).)
+
+### Step 3 — Add the Posta server
+
+Paste this into the file, then replace `posta_your_token_here` with the token from Step 1:
 
 ```json
 {
@@ -48,9 +43,55 @@ Once published to npm you can use `npx` instead of an absolute path:
 }
 ```
 
-Cursor, Windsurf, VS Code (Cline/Continue), and Zed use the same `command`/`args`/`env` shape in their respective MCP settings.
+If the file already has other servers under `"mcpServers"`, add the `"posta"` block next to them — don't create a second `"mcpServers"` key.
 
-### Environment
+### Step 4 — Restart the client
+
+**Fully quit and reopen** your MCP client (close the window is not enough — quit the app). The first launch downloads the package, so give it a few seconds.
+
+### Step 5 — Verify it works
+
+Start a new chat and ask: **"List my connected Posta accounts."** Claude should call the `posta_list_accounts` tool (approve it if prompted). If you see your accounts, you're done.
+
+> **Windows:** if you get a "command not found" error, set `"command": "npx.cmd"` instead of `"npx"`, and make sure Node.js is installed (from [nodejs.org](https://nodejs.org)) so `npx` is on your PATH.
+
+<a id="config-location-per-client"></a>
+### Config location per client
+
+Every client uses the **same `command` / `args` / `env` block** shown above — only the location differs:
+
+| Client | Where the config lives |
+| --- | --- |
+| **Claude Desktop** | **Settings → Developer → Edit Config**, or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) / `%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
+| **Cursor** | **Settings → MCP → Add new server**, or `~/.cursor/mcp.json` |
+| **Windsurf** | **Settings → Cascade → MCP servers → Manage**, or `~/.codeium/windsurf/mcp_config.json` |
+| **VS Code (Cline / Continue)** | the extension's MCP settings (Cline: **MCP Servers → Configure MCP Servers**) |
+| **Zed** | `settings.json` → `"context_servers"` |
+
+## Run from source (development only)
+
+You only need this if you're modifying the server itself. Clone the repo, then:
+
+```bash
+npm install
+npm run build
+```
+
+Then point your client at the built file with an absolute path instead of `npx`:
+
+```json
+{
+  "mcpServers": {
+    "posta": {
+      "command": "node",
+      "args": ["/absolute/path/to/posta-mcp/dist/index.js"],
+      "env": { "POSTA_API_TOKEN": "posta_your_token_here" }
+    }
+  }
+}
+```
+
+## Environment variables
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
