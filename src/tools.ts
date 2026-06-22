@@ -9,10 +9,29 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { PostaClient, PostaApiError } from "./client.js";
 
-/** Render any value as a pretty-printed JSON text result. */
-function ok(value: unknown) {
-  const text =
-    typeof value === "string" ? value : JSON.stringify(value, null, 2);
+/**
+ * Render any value as a pretty-printed JSON text result.
+ *
+ * Important: the Posta API returns 204 No Content / empty bodies for
+ * destructive endpoints (DELETE, cancel) and a few others. In those cases
+ * `client.request()` resolves with `undefined`. JSON.stringify(undefined) is
+ * itself `undefined` (NOT the string "undefined"), which produces
+ * `content: [{ type: "text", text: undefined }]` and fails MCP's schema
+ * validation on the client side ("expected string, received undefined").
+ *
+ * Treat `undefined`/`null` as a generic success and emit a minimal JSON ack
+ * so every tool returns a schema-valid content block, regardless of the
+ * upstream HTTP body.
+ */
+export function ok(value: unknown) {
+  let text: string;
+  if (typeof value === "string") {
+    text = value;
+  } else if (value === undefined || value === null) {
+    text = JSON.stringify({ ok: true });
+  } else {
+    text = JSON.stringify(value, null, 2);
+  }
   return { content: [{ type: "text" as const, text }] };
 }
 
@@ -183,7 +202,12 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Cancel a scheduled post so it will not be published.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.post(`/posts/${enc(postId)}/cancel`)),
+    // Cancel endpoint returns an empty body. Surface { cancelled, id } so the
+    // LLM has useful context to feed back to the user.
+    guard(async ({ postId }) => {
+      await client.post(`/posts/${enc(postId)}/cancel`);
+      return { cancelled: true, id: postId };
+    }),
   );
 
   server.registerTool(
@@ -193,7 +217,13 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Permanently delete a post.",
       inputSchema: { postId: z.string() },
     },
-    guard(({ postId }) => client.delete(`/posts/${enc(postId)}`)),
+    // DELETE returns 204 No Content. Echo the id back so the tool result is
+    // informative; also avoids the empty-body content-validation crash on
+    // older MCP SDKs that don't tolerate undefined text fields.
+    guard(async ({ postId }) => {
+      await client.delete(`/posts/${enc(postId)}`);
+      return { deleted: true, id: postId };
+    }),
   );
 
   server.registerTool(
@@ -264,7 +294,11 @@ export function registerTools(server: McpServer, client: PostaClient): void {
       description: "Delete a media asset from the library.",
       inputSchema: { mediaId: z.string() },
     },
-    guard(({ mediaId }) => client.delete(`/media/${enc(mediaId)}`)),
+    // DELETE returns 204 No Content — same handling as posta_delete_post.
+    guard(async ({ mediaId }) => {
+      await client.delete(`/media/${enc(mediaId)}`);
+      return { deleted: true, id: mediaId };
+    }),
   );
 
   server.registerTool(

@@ -1,6 +1,6 @@
 {
   "name": "posta-mcp",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for Posta (getposta.app) — schedule and publish to multiple social platforms from any MCP client (Claude Desktop, Cursor, Windsurf, VS Code, Zed, …).",
   "license": "MIT",
   "type": "module",
